@@ -1,0 +1,199 @@
+# FUTUISP Analytics - Contexto para LLMs
+
+## Propósito del Sistema
+Microservicio Python que analiza el comportamiento de pagos de clientes ISP, clasificándolos en períodos de rendimiento para facilitar la toma de decisiones operativas.
+
+## Arquitectura
+- **Patrón**: Hexagonal (Ports & Adapters)
+- **Framework**: FastAPI
+- **ORM**: SQLAlchemy (async)
+- **Caché**: Redis
+- **Base de datos**: MySQL remota (231K facturas)
+
+## Lógica de Negocio Core
+
+### Clasificación de Períodos de Pago
+```python
+OPTIMO (100% rendimiento):
+  - Pago entre día 1-10 del mes de emisión
+  - Cliente cumplidor, flujo de caja predecible
+
+ACEPTABLE (75% rendimiento):
+  - Pago entre día 11 y día de corte del cliente
+  - Paga antes de suspensión, pero con retraso
+
+CRITICO (40% rendimiento):
+  - Pago después del día de corte
+  - Servicio suspendido, cliente moroso
+
+PENDIENTE (0% rendimiento):
+  - Factura aún no pagada
+  - Requiere seguimiento activo
+```
+
+### Cálculo de Métricas
+```python
+Por período:
+- cantidad_usuarios: COUNT(facturas)
+- monto_total: SUM(cobrado)
+- porcentaje: (cantidad / total) * 100
+- dias_promedio_pago: AVG(fecha_pago - fecha_emision)
+```
+
+## Flujo de Datos
+
+1. **Request HTTP** → FastAPI endpoint
+2. **Verificar caché** → Redis (TTL 5 min)
+3. **Si no existe** → Query SQL complejo
+4. **Transformar** → Entidades de dominio
+5. **Agregar** → Caso de uso
+6. **Guardar caché** → Redis
+7. **Response JSON** → Cliente
+
+## Tablas Principales
+
+### facturas
+- Relación: 1:N con operaciones
+- Campos clave: id, idcliente, emitido, vencimiento, estado, total, cobrado
+
+### operaciones  
+- Registro de pagos (uno o más por factura)
+- Campos clave: nfactura, fecha_pago, cobrado, operador
+
+### tblavisouser
+- Configuración por cliente
+- Campo crítico: corteautomatico (día del mes para suspensión)
+
+### usuarios
+- Datos del cliente
+- Campo crítico: estado (ACTIVO/SUSPENDIDO)
+
+## Query SQL Core (Simplificado)
+```sql
+SELECT 
+    f.id,
+    MIN(o.fecha_pago) AS primer_pago,
+    SUM(o.cobrado) AS total_pagado,
+    CASE 
+        WHEN DAY(MIN(o.fecha_pago)) BETWEEN 1 AND 10 THEN 'OPTIMO'
+        WHEN DAY(MIN(o.fecha_pago)) <= tav.corteautomatico THEN 'ACEPTABLE'
+        ELSE 'CRITICO'
+    END AS periodo
+FROM facturas f
+JOIN tblavisouser tav ON tav.cliente = f.idcliente
+LEFT JOIN operaciones o ON o.nfactura = f.id
+WHERE f.emitido >= ? AND f.emitido < ?
+GROUP BY f.id
+```
+
+## Endpoints Principales
+
+### GET /api/v1/health
+Verifica estado de servicios (DB + Redis)
+
+### GET /api/v1/analytics/payment-behavior
+Parámetros:
+- fecha_inicio (date): Inicio del período
+- fecha_fin (date): Fin del período  
+- zona_id (int, optional): Filtrar por zona
+
+Retorna:
+```json
+{
+  "periodo": "YYYY-MM",
+  "total_facturas": int,
+  "metricas": {
+    "OPTIMO": {
+      "cantidad_usuarios": int,
+      "monto_total": float,
+      "porcentaje": float,
+      "dias_promedio_pago": float,
+      "rendimiento": int
+    },
+    ...
+  }
+}
+```
+
+## Optimizaciones Implementadas
+
+1. **Caché Redis**: Evita recalcular métricas en cada request
+2. **Subconsultas optimizadas**: MIN/SUM agregados en subconsulta, no por fila
+3. **Connection pooling**: Reutilización de conexiones MySQL
+4. **Async/await**: No bloquea el event loop
+
+## Índices Recomendados
+```sql
+CREATE INDEX idx_facturas_emitido_estado ON facturas(emitido, estado);
+CREATE INDEX idx_operaciones_nfactura_pago ON operaciones(nfactura, fecha_pago, cobrado);
+CREATE INDEX idx_tblavisouser_cliente ON tblavisouser(cliente);
+```
+
+## Variables de Entorno Críticas
+```
+DB_HOST: Hostname de MySQL (sin https://)
+DB_PASSWORD: Escapado automáticamente con quote_plus()
+REDIS_TTL: Tiempo de vida del caché (default 300s)
+DEBUG: true = logs verbosos de SQLAlchemy
+```
+
+## Consideraciones de Seguridad
+
+- Base de datos remota con acceso restringido por IP (iptables)
+- Passwords con caracteres especiales requieren URL encoding
+- Redis en localhost sin autenticación (solo desarrollo)
+- En producción: Redis con password + SSL
+
+## Testing Rápido
+```bash
+# Verificar salud
+curl http://localhost:12048/api/v1/health
+
+# Obtener métricas octubre 2024
+curl "http://localhost:12048/api/v1/analytics/payment-behavior?fecha_inicio=2024-10-01&fecha_fin=2024-11-01"
+
+# Timing con caché
+time curl "http://localhost:12048/api/v1/analytics/payment-behavior?fecha_inicio=2024-10-01&fecha_fin=2024-11-01"
+```
+
+## Próximos Pasos Sugeridos
+
+1. Implementar wrapper PHP para integración con sistema legacy
+2. Agregar índices en BD si queries > 3 segundos
+3. Dashboard web con visualizaciones (Chart.js/Plotly)
+4. Batch job nocturno para pre-calcular métricas históricas
+5. Sistema de alertas cuando CRITICO > 30%
+
+## Errores Comunes
+
+### "ModuleNotFoundError: No module named 'redis'"
+```bash
+uv pip install redis
+```
+
+### "ValueError: invalid literal for int() with base 10: ''"
+- DB_HOST tiene protocolo (https://) → removerlo
+- DB_PORT vacío en .env → agregar 3306
+
+### "Can't connect to MySQL server"
+- Verificar firewall/iptables
+- Verificar permisos de usuario remoto
+- Probar: `mysql -h HOST -P 3306 -u root -p`
+
+## Comandos Útiles
+```bash
+# Levantar solo Redis
+docker compose -f docker-compose.dev.yml up -d
+
+# Ver logs en tiempo real
+docker compose -f docker-compose.dev.yml logs -f
+
+# Detener servicios
+docker compose -f docker-compose.dev.yml down
+
+# Reinstalar dependencias
+uv pip install -e . --force-reinstall
+
+# Ejecutar con auto-reload
+uvicorn futuisp_analytics.interfaces.api.main:app --reload --port 12048
+```

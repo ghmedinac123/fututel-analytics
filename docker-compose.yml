@@ -1,0 +1,60 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: futuisp-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7862:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - futuisp-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: futuisp-analytics-api
+    restart: unless-stopped
+    ports:
+      - "12048:8000"
+    env_file:
+      - .env.production
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - TZ=America/Bogota
+
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - futuisp-network
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  futuisp-network:
+    driver: bridge

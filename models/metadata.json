@@ -1,0 +1,77 @@
+{
+  "churn_model_2025-11": {
+    "model_name": "churn_model_2025-11",
+    "model_path": "models/churn_model_2025-11.pkl",
+    "feature_names": [
+      "total_facturas",
+      "facturas_pendientes",
+      "deuda_total",
+      "promedio_dias_pago",
+      "max_dias_pago",
+      "std_dias_pago",
+      "dias_ultima_factura",
+      "dias_desde_ultimo_pago",
+      "antiguedad_meses",
+      "corteautomatico",
+      "zona",
+      "mora_activa",
+      "reconexion_historica",
+      "tiene_suspension_reciente",
+      "dias_suspension_reciente",
+      "dias_pago_ultimos_3m",
+      "dias_pago_3m_anteriores",
+      "pagos_puntuales_count",
+      "pagos_muy_tardios_count",
+      "variacion_monto_facturas",
+      "promedio_monto_factura",
+      "monto_maximo_factura",
+      "monto_minimo_factura",
+      "facturas_ultimos_3m",
+      "facturas_pagadas_ultimos_3m",
+      "tendencia_pago",
+      "porcentaje_pagos_puntuales",
+      "ratio_deuda",
+      "coef_variacion_monto",
+      "meses_desde_ultima_factura",
+      "ratio_facturas_pendientes",
+      "severidad_mora",
+      "score_riesgo_economico",
+      "porcentaje_pagos_muy_tardios",
+      "ratio_actividad_reciente",
+      "tasa_pago_reciente",
+      "dias_mora_real",
+      "ratio_mora_vs_limite",
+      "volatilidad_pago",
+      "aceleracion_mora"
+    ],
+    "metrics": {
+      "training_date": "2025-11-06T17:15:38.974148",
+      "samples_total": 6443,
+      "samples_train": 5154,
+      "samples_test": 1289,
+      "churn_rate": 19.742356045320502,
+      "train_accuracy": 0.9998059759410167,
+      "train_precision": 0.9990186457311089,
+      "train_recall": 1.0,
+      "train_f1": 0.9995090819833088,
+      "test_accuracy": 0.9968968192397207,
+      "test_precision": 0.98828125,
+      "test_recall": 0.9960629921259843,
+      "test_f1": 0.9921568627450981,
+      "test_roc_auc": 0.9993761649359048,
+      "confusion_matrix": [
+        [
+          1032,
+          3
+        ],
+        [
+          1,
+          253
+        ]
+      ],
+      "cv_roc_auc_mean": 0.9995457683552929,
+      "cv_roc_auc_std": 0.0006058896935906659
+    },
+    "saved_at": "2025-11-06T17:15:41.203257"
+  }
+}
