@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     app_name: str = "FUTUISP Analytics"
     app_version: str = "0.1.0"
     debug: bool = False
+
+    score_umbral_minimo_facturas: int = 2 # Default 3 si no está en .env
     
     @property
     def database_url(self) -> str:

@@ -10,7 +10,7 @@ import polars as pl
 from futuisp_analytics.infrastructure.ml.feature_extractor import ChurnFeatureExtractor
 from futuisp_analytics.infrastructure.ml.model_storage import ModelStorage
 from futuisp_analytics.infrastructure.config.logging import logger
-
+from futuisp_analytics.infrastructure.config.settings import get_settings
 
 class PredecirChurn:
     """Caso de uso para predecir churn de usuarios."""
@@ -21,6 +21,7 @@ class PredecirChurn:
         models_dir: str = "models"
     ):
         self.session = session
+        self.settings = get_settings() 
         self.feature_extractor = ChurnFeatureExtractor(session)
         self.storage = ModelStorage(models_dir)
         
@@ -28,6 +29,7 @@ class PredecirChurn:
         self.model, self.feature_names, self.metrics = self.storage.load_model()
         
         logger.info(f"Modelo cargado - Test Accuracy: {self.metrics.get('test_accuracy', 0):.4f}")
+        logger.info(f"Umbral mínimo facturas: {self.settings.score_umbral_minimo_facturas}") 
     
     async def predecir_usuario(self, usuario_id: int) -> Optional[Dict]:
         """

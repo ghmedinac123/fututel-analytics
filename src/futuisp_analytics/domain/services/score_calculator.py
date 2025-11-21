@@ -54,16 +54,26 @@ class ScoreCalculator:
         return round(puntos / total_facturas, 2)
     
     @staticmethod
-    def calcular_nivel_riesgo(score: float) -> str:
+    def calcular_nivel_riesgo(
+        score: float, 
+        total_facturas: int,
+        umbral_minimo: int = 2  # ✅ NUEVO: Parámetro configurable con default
+    ) -> str:
         """
         Determina nivel de riesgo según score.
         
         Args:
             score: Score calculado (0-100)
+            total_facturas: Total de facturas históricas
+            umbral_minimo: Mínimo de facturas para evaluar (default: 3)
             
         Returns:
-            Nivel de riesgo: BAJO, MEDIO, ALTO, CRITICO
+            Nivel de riesgo: BAJO, MEDIO, ALTO, CRITICO, SIN_EVALUAR
         """
+        # ✅ NUEVO: Validar umbral configurable
+        if total_facturas < umbral_minimo:
+            return "SIN_EVALUAR"
+        
         if score >= 90:
             return "BAJO"
         elif score >= 70:

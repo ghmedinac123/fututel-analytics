@@ -6,13 +6,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 import polars as pl
 from futuisp_analytics.domain.services.score_calculator import ScoreCalculator
-
+from futuisp_analytics.infrastructure.config.settings import get_settings  # ✅ NUEVO IMPORT
 
 class ObtenerRankingGlobal:
     """Obtiene ranking global de usuarios con filtros y paginación."""
     
     def __init__(self, session: AsyncSession):
         self.session = session
+        self.settings = get_settings()  # ✅ NUEVO: Cargar config
     
     # ✅ CORRECCIÓN: Estos métodos van al nivel de la CLASE, no dentro de __init__
     async def execute(
@@ -120,6 +121,8 @@ class ObtenerRankingGlobal:
         # ✅ NO FILTRAR POR FECHA - Score histórico requiere todas las facturas
         
         where_clause = " AND ".join(filtros_sql)
+
+        umbral = self.settings.score_umbral_minimo_facturas  # ✅ AGREGAR ESTA LÍNEA
         
         # Query cuenta TODAS las facturas históricas por categoría
         query = text(f"""
@@ -182,8 +185,10 @@ class ObtenerRankingGlobal:
             ) op ON op.nfactura = f.id
             WHERE {where_clause}
             GROUP BY u.id
-            HAVING total_facturas > 0
+            HAVING total_facturas >= :umbral  
         """)
+
+        params["umbral"] = umbral
         
         result = await self.session.execute(query, params)
         rows = result.fetchall()
@@ -229,7 +234,11 @@ class ObtenerRankingGlobal:
                 facturas_criticas=row["facturas_criticas"],
                 facturas_pendientes=row["facturas_pendientes"],
             )
-            row["nivel_riesgo"] = ScoreCalculator.calcular_nivel_riesgo(row["score"])
+            row["nivel_riesgo"] = ScoreCalculator.calcular_nivel_riesgo(
+                row["score"],
+                row["total_facturas"],
+                self.settings.score_umbral_minimo_facturas  # ✅ AGREGAR ESTOS DOS PARÁMETROS
+            )
             
             # ✅ MANTENER COMPATIBILIDAD CON CAMPOS ORIGINALES
             row["facturas_puntuales"] = row["facturas_optimas"]  # Día 1-10

@@ -2,13 +2,14 @@
 from futuisp_analytics.application.ports.factura_repository import FacturaRepository
 from futuisp_analytics.domain.value_objects.score_cliente import ScoreCliente
 from futuisp_analytics.domain.value_objects.periodo_pago import PeriodoPago
-
+from futuisp_analytics.infrastructure.config.settings import get_settings  # ✅ NUEVO IMPORT
 
 class ObtenerHistorialUsuario:
     """Caso de uso para análisis individual de usuario."""
     
     def __init__(self, factura_repo: FacturaRepository):
         self.factura_repo = factura_repo
+        self.settings = get_settings()  # ✅ NUEVO
     
     async def execute(self, usuario_id: int) -> dict:
         """
@@ -42,6 +43,7 @@ class ObtenerHistorialUsuario:
             facturas_aceptables=contadores[PeriodoPago.ACEPTABLE],
             facturas_criticas=contadores[PeriodoPago.CRITICO],
             facturas_pendientes=contadores[PeriodoPago.PENDIENTE],
+            umbral_minimo=self.settings.score_umbral_minimo_facturas  # ✅ NUEVO PARÁMETRO
         )
         
         # Agrupar por mes para visualización

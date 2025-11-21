@@ -7,7 +7,7 @@ from typing import Optional
 import polars as pl
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-
+from futuisp_analytics.infrastructure.config.settings import get_settings 
 from futuisp_analytics.infrastructure.config.logging import logger
 
 
@@ -16,7 +16,7 @@ class ChurnFeatureExtractor:
     
     def __init__(self, session: AsyncSession):
         self.session = session
-    
+        self.settings = get_settings()  # ✅ NUEVO    
     async def extract_training_data(
         self, 
         meses_historicos: int = 24,  # ✅ 2 años
@@ -232,12 +232,24 @@ class ChurnFeatureExtractor:
         ).replace("AND u.estado IN", "-- AND u.estado IN")
     
     def _build_active_users_query(self) -> str:
-        """Query para usuarios ACTIVOS (usa misma lógica limpia)."""
-        base_query = self._build_training_query(12, 1)
-        return base_query.replace(
+        """
+        Query para usuarios ACTIVOS con umbral mínimo de facturas.
+        ✅ MODIFICADO: Aplica umbral para evitar predecir usuarios nuevos.
+        """
+        umbral = self.settings.score_umbral_minimo_facturas  # ✅ NUEVO
+        
+        base_query = self._build_training_query(12, 1)  # Traer estructura base
+        
+        # Aplicar filtros para predicción
+        query_modificada = base_query.replace(
             "AND u.estado IN ('ACTIVO', 'RETIRADO', 'SUSPENDIDO')",
-            "AND u.estado = 'ACTIVO'"
+            "AND u.estado = 'ACTIVO'"  # Solo ACTIVOS
+        ).replace(
+            "HAVING total_facturas >= 1",  # ✅ Original
+            f"HAVING total_facturas >= {umbral}"  # ✅ NUEVO: Umbral dinámico
         )
+        
+        return query_modificada
     
     def _process_features(self, df: pl.DataFrame) -> pl.DataFrame:
         """Procesa features con LAZY EXECUTION de Polars."""

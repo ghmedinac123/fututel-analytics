@@ -13,12 +13,13 @@ from futuisp_analytics.infrastructure.database.models import (
     Operacion,
 )
 from futuisp_analytics.domain.services.periodo_clasificador import PeriodoClasificador
-
+from futuisp_analytics.infrastructure.config.settings import get_settings  # ✅ NUEVO IMPORT
 class FacturaRepositoryImpl(FacturaRepository):
     """Implementación de repositorio de facturas."""
     
     def __init__(self, session: AsyncSession):
         self.session = session
+        self.settings = get_settings()  # ✅ AGREGAR ESTA LÍNEA
     
     async def obtener_analisis_mes(
         self,
@@ -276,6 +277,7 @@ class FacturaRepositoryImpl(FacturaRepository):
                 facturas_aceptables=datos["aceptables"],
                 facturas_criticas=datos["criticas"],
                 facturas_pendientes=datos["pendientes"],
+                umbral_minimo=self.settings.score_umbral_minimo_facturas
             )
             
             resultado.append({

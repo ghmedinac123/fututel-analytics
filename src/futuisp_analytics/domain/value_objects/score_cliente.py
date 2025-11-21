@@ -15,6 +15,7 @@ class ScoreCliente:
     facturas_aceptables: int
     facturas_criticas: int
     facturas_pendientes: int
+    umbral_minimo: int = 3  # ✅ NUEVO: Configurable con default
     
     @property
     def score_total(self) -> float:
@@ -31,8 +32,12 @@ class ScoreCliente:
     
     @property
     def nivel_riesgo(self) -> str:
-        """✅ USA DOMAIN SERVICE."""
-        return ScoreCalculator.calcular_nivel_riesgo(self.score_total)
+        """✅ MODIFICADO: Usar umbral configurable."""
+        return ScoreCalculator.calcular_nivel_riesgo(
+            self.score_total, 
+            self.total_facturas,
+            self.umbral_minimo  # ✅ NUEVO PARÁMETRO
+        )
     
     @property
     def porcentaje_puntualidad(self) -> float:
